@@ -1,56 +1,36 @@
 package software.amazon.logs.loggroup;
 
-import software.amazon.cloudformation.exceptions.CfnAlreadyExistsException;
+import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
+import software.amazon.cloudformation.proxy.CallChain;
 import software.amazon.cloudformation.proxy.Logger;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 import software.amazon.cloudformation.resource.IdentifierUtils;
 import com.amazonaws.util.StringUtils;
-import software.amazon.awssdk.services.cloudwatchlogs.model.ResourceAlreadyExistsException;
 
-import java.util.Objects;
+import static software.amazon.logs.loggroup.Util.*;
 
 public class CreateHandler extends BaseHandler<CallbackContext> {
     private static final String DEFAULT_LOG_GROUP_NAME_PREFIX = "LogGroup";
     private static final int MAX_LENGTH_LOG_GROUP_NAME = 512;
 
-    private AmazonWebServicesClientProxy proxy;
-    private ResourceHandlerRequest<ResourceModel> request;
-    private Logger logger;
-
     @Override
-    public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
-        final AmazonWebServicesClientProxy proxy,
-        final ResourceHandlerRequest<ResourceModel> request,
-        final CallbackContext callbackContext,
-        final Logger logger) {
+    public ProgressEvent<ResourceModel, CallbackContext> handleRequest(final AmazonWebServicesClientProxy proxy,
+                                                                       final ResourceHandlerRequest<ResourceModel> request,
+                                                                       final CallbackContext callbackContext,
+                                                                       final Logger logger) {
 
-        this.proxy = proxy;
-        this.request = request;
-        this.logger = logger;
+        final ResourceModel model = resourceModel(request);
+        final CallbackContext context = callbackContext == null ? new CallbackContext() : callbackContext;
+        final CallChain.Initiator<CloudWatchLogsClient, ResourceModel, CallbackContext>
+            initiator = proxy.newInitiator(ClientBuilder::getClient, model, context);
 
-        prepareResourceModel();
-
-        final ResourceModel model = request.getDesiredResourceState();
-
-        try {
-            proxy.injectCredentialsAndInvokeV2(Translator.translateToCreateRequest(model),
-                ClientBuilder.getClient()::createLogGroup);
-        } catch (final ResourceAlreadyExistsException e) {
-            throw new CfnAlreadyExistsException(ResourceModel.TYPE_NAME,
-                Objects.toString(model.getPrimaryIdentifier()));
-        }
-
-        final String createMessage = String.format("%s [%s] successfully created.",
-                ResourceModel.TYPE_NAME, model.getLogGroupName());
-        logger.log(createMessage);
-
-        if (model.getRetentionInDays() != null) {
-            updateRetentionInDays();
-        }
-
-        return ProgressEvent.defaultSuccessHandler(model);
+        return
+            createLogGroup(initiator)
+            .then(event -> updateRetentionInDays(initiator, event))
+            .then(event -> associateKMSKey(initiator, event))
+            .then(event -> new ReadHandler().handleRequest(proxy, request, event.getCallbackContext(), logger));
     }
 
     /**
@@ -62,7 +42,7 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
      * 2. Generating a log name if one is not given. This is a createOnly property,
      *    but we generate one if one is not provided.
      */
-    private void prepareResourceModel() {
+    private ResourceModel resourceModel(ResourceHandlerRequest<ResourceModel> request) {
         if (request.getDesiredResourceState() == null) {
             request.setDesiredResourceState(new ResourceModel());
         }
@@ -81,16 +61,6 @@ public class CreateHandler extends BaseHandler<CallbackContext> {
                 )
             );
         }
-    }
-
-    private void updateRetentionInDays() {
-        final ResourceModel model = request.getDesiredResourceState();
-        proxy.injectCredentialsAndInvokeV2(Translator.translateToPutRetentionPolicyRequest(model),
-            ClientBuilder.getClient()::putRetentionPolicy);
-
-        final String retentionPolicyMessage =
-            String.format("%s [%s] successfully applied retention in days: [%d].",
-                ResourceModel.TYPE_NAME, model.getLogGroupName(), model.getRetentionInDays());
-        logger.log(retentionPolicyMessage);
+        return request.getDesiredResourceState();
     }
 }

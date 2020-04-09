@@ -1,12 +1,13 @@
 package software.amazon.logs.loggroup;
 
+import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
+import software.amazon.awssdk.services.cloudwatchlogs.model.DeleteLogGroupRequest;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
+import software.amazon.cloudformation.proxy.CallChain;
 import software.amazon.cloudformation.proxy.Logger;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
 import software.amazon.awssdk.services.cloudwatchlogs.model.ResourceNotFoundException;
-
-import java.util.Objects;
 
 public class DeleteHandler extends BaseHandler<CallbackContext> {
 
@@ -18,17 +19,22 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
         final Logger logger) {
 
         final ResourceModel model = request.getDesiredResourceState();
-        try {
-            proxy.injectCredentialsAndInvokeV2(Translator.translateToDeleteRequest(model),
-                ClientBuilder.getClient()::deleteLogGroup);
-        } catch (final ResourceNotFoundException e) {
-            throw new software.amazon.cloudformation.exceptions.ResourceNotFoundException(ResourceModel.TYPE_NAME,
-                Objects.toString(model.getPrimaryIdentifier()));
-        }
+        final CallbackContext context = callbackContext == null ? new CallbackContext() : callbackContext;
+        final CallChain.Initiator<CloudWatchLogsClient, ResourceModel, CallbackContext>
+            initiator = proxy.newInitiator(ClientBuilder::getClient, model, context);
 
-        final String message = String.format("%s [%s] successfully deleted.",
-                ResourceModel.TYPE_NAME, model.getLogGroupName());
-        logger.log(message);
-        return ProgressEvent.defaultSuccessHandler(null);
+        return initiator.initiate("logs:deleteLogGroup")
+            .translate(m -> DeleteLogGroupRequest.builder().logGroupName(m.getLogGroupName()).build())
+            .call((r, c) -> c.injectCredentialsAndInvokeV2(r, c.client()::deleteLogGroup))
+            .handleError(
+                (request_, exception, client, model_, context_) -> {
+                    if (exception instanceof ResourceNotFoundException) {
+                        return ProgressEvent.success(model_, context_);
+                    }
+                    throw exception;
+                }
+            )
+            .success();
+
     }
 }

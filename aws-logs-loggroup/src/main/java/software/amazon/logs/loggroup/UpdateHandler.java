@@ -1,21 +1,14 @@
 package software.amazon.logs.loggroup;
 
+import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
+import software.amazon.cloudformation.proxy.CallChain;
 import software.amazon.cloudformation.proxy.Logger;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
-import software.amazon.awssdk.services.cloudwatchlogs.model.DeleteRetentionPolicyRequest;
-import software.amazon.awssdk.services.cloudwatchlogs.model.PutRetentionPolicyRequest;
-import software.amazon.awssdk.services.cloudwatchlogs.model.ResourceNotFoundException;
-
-import java.util.Objects;
+import static software.amazon.logs.loggroup.Util.*;
 
 public class UpdateHandler extends BaseHandler<CallbackContext> {
-
-    private AmazonWebServicesClientProxy proxy;
-    private ResourceHandlerRequest<ResourceModel> request;
-    private CallbackContext callbackContext;
-    private Logger logger;
 
     @Override
     public ProgressEvent<ResourceModel, CallbackContext> handleRequest(
@@ -24,63 +17,53 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         final CallbackContext callbackContext,
         final Logger logger) {
 
-        this.proxy = proxy;
-        this.request = request;
-        this.callbackContext = callbackContext;
-        this.logger = logger;
+        final ResourceModel current = request.getPreviousResourceState();
+        final ResourceModel desired = request.getDesiredResourceState();
+        final CallbackContext context = callbackContext == null ? new CallbackContext() : callbackContext;
+        final CallChain.Initiator<CloudWatchLogsClient, ResourceModel, CallbackContext>
+            initiator = proxy.newInitiator(ClientBuilder::getClient, desired, context);
 
-        // RetentionPolicyInDays is the only attribute that is not createOnly
-        return updateRetentionPolicy();
+        return
+            handleRetentionChange(desired, current, initiator)
+            .then(evt -> handleKMSKeyChange(desired, current, initiator, evt))
+            .then(evt -> new ReadHandler().handleRequest(proxy, request, callbackContext, logger));
     }
 
-    private ProgressEvent<ResourceModel, CallbackContext> updateRetentionPolicy() {
-        final ResourceModel model = request.getDesiredResourceState();
+    protected ProgressEvent<ResourceModel, CallbackContext> handleRetentionChange(
+        final ResourceModel desired,
+        final ResourceModel current,
+        final CallChain.Initiator<CloudWatchLogsClient, ResourceModel, CallbackContext> initiator) {
 
-        if (model.getRetentionInDays() == null) {
-            deleteRetentionPolicy();
-        } else {
-            putRetentionPolicy();
+        if (desired.getRetentionInDays() == null && current.getRetentionInDays() != null) {
+            return deleteRetentionPolicy(initiator);
         }
-
-        return ProgressEvent.defaultSuccessHandler(model);
+        return updateRetentionInDays(initiator,
+            ProgressEvent.progress(initiator.getResourceModel(), initiator.getCallbackContext()));
     }
 
-    private void deleteRetentionPolicy() {
-        final ResourceModel model = request.getDesiredResourceState();
-        final DeleteRetentionPolicyRequest deleteRetentionPolicyRequest =
-            Translator.translateToDeleteRetentionPolicyRequest(model);
-        try {
-            proxy.injectCredentialsAndInvokeV2(deleteRetentionPolicyRequest,
-                ClientBuilder.getClient()::deleteRetentionPolicy);
-        } catch (final ResourceNotFoundException e) {
-            throwNotFoundException(model);
+    protected ProgressEvent<ResourceModel, CallbackContext> handleKMSKeyChange(
+        final ResourceModel desired,
+        final ResourceModel current,
+        final CallChain.Initiator<CloudWatchLogsClient, ResourceModel, CallbackContext> initiator,
+        final ProgressEvent<ResourceModel, CallbackContext> chainedEvent) {
+
+        //
+        // Handle KMS key changes
+        //
+        if (desired.getKMSKey() == null && current.getKMSKey() != null) {
+            return disassociateKMSKey(initiator);
         }
-
-        final String retentionPolicyMessage =
-            String.format("%s [%s] successfully deleted retention policy.",
-                ResourceModel.TYPE_NAME, model.getLogGroupName());
-        logger.log(retentionPolicyMessage);
-    }
-
-    private void putRetentionPolicy() {
-        final ResourceModel model = request.getDesiredResourceState();
-        final PutRetentionPolicyRequest putRetentionPolicyRequest =
-            Translator.translateToPutRetentionPolicyRequest(model);
-        try {
-            proxy.injectCredentialsAndInvokeV2(putRetentionPolicyRequest,
-                ClientBuilder.getClient()::putRetentionPolicy);
-        } catch (final ResourceNotFoundException e) {
-            throwNotFoundException(model);
+        else if (desired.getKMSKey() != null && !desired.getKMSKey().equals(current.getKMSKey())) {
+            //
+            // Change KMS keys association
+            //
+            return associateKMSKey(initiator, chainedEvent);
         }
-
-        final String retentionPolicyMessage =
-            String.format("%s [%s] successfully applied retention in days: [%d].",
-                ResourceModel.TYPE_NAME, model.getLogGroupName(), model.getRetentionInDays());
-        logger.log(retentionPolicyMessage);
+        //
+        // No change, return chained Event
+        //
+        return chainedEvent;
     }
 
-    private void throwNotFoundException(final ResourceModel model) {
-        throw new software.amazon.cloudformation.exceptions.ResourceNotFoundException(ResourceModel.TYPE_NAME,
-            Objects.toString(model.getPrimaryIdentifier()));
-    }
+
 }
