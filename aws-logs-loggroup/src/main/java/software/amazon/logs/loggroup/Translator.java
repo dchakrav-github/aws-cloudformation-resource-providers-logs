@@ -5,6 +5,7 @@ import software.amazon.awssdk.services.cloudwatchlogs.model.DeleteLogGroupReques
 import software.amazon.awssdk.services.cloudwatchlogs.model.DeleteRetentionPolicyRequest;
 import software.amazon.awssdk.services.cloudwatchlogs.model.DescribeLogGroupsRequest;
 import software.amazon.awssdk.services.cloudwatchlogs.model.DescribeLogGroupsResponse;
+import software.amazon.awssdk.services.cloudwatchlogs.model.LogGroup;
 import software.amazon.awssdk.services.cloudwatchlogs.model.PutRetentionPolicyRequest;
 
 import java.util.Collection;
@@ -71,10 +72,15 @@ final class Translator {
                 .filter(Objects::nonNull)
                 .findAny()
                 .orElse(null);
+        final String kmsKeyId = streamOfOrEmpty(response.logGroups())
+            .map(LogGroup::kmsKeyId)
+            .filter(Objects::nonNull)
+            .findFirst().orElse(null);
         return ResourceModel.builder()
                 .arn(logGroupArn)
                 .logGroupName(logGroupName)
                 .retentionInDays(retentionInDays)
+                .kMSKey(kmsKeyId)
                 .build();
     }
 

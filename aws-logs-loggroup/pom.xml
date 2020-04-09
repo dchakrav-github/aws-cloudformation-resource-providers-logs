@@ -102,10 +102,11 @@
 
         <dependency>
             <groupId>software.amazon.cloudformation.test</groupId>
-            <artifactId>aws-cloudformation-local-test</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <artifactId>cloudformation-cli-java-plugin-testing-support</artifactId>
+            <version>1.0</version>
             <scope>test</scope>
         </dependency>
+
     </dependencies>
 
     <build>
