@@ -2,6 +2,8 @@ package software.amazon.logs.loggroup;
 
 import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
 import software.amazon.awssdk.services.cloudwatchlogs.model.DeleteLogGroupRequest;
+import software.amazon.awssdk.services.cloudwatchlogs.model.DescribeLogGroupsRequest;
+import software.amazon.awssdk.services.cloudwatchlogs.model.DescribeLogGroupsResponse;
 import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
 import software.amazon.cloudformation.proxy.CallChain;
 import software.amazon.cloudformation.proxy.Logger;
@@ -25,16 +27,26 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
 
         return initiator.initiate("logs:deleteLogGroup")
             .translate(m -> DeleteLogGroupRequest.builder().logGroupName(m.getLogGroupName()).build())
-            .call((r, c) -> c.injectCredentialsAndInvokeV2(r, c.client()::deleteLogGroup))
-            .handleError(
-                (request_, exception, client, model_, context_) -> {
-                    if (exception instanceof ResourceNotFoundException) {
-                        return ProgressEvent.success(model_, context_);
-                    }
-                    throw exception;
+            .call((r, c) -> {
+                try {
+                    return c.injectCredentialsAndInvokeV2(r, c.client()::deleteLogGroup);
+                } catch (ResourceNotFoundException e) {
+                    throw new software.amazon.cloudformation.exceptions.ResourceNotFoundException(e);
                 }
-            )
-            .success();
+            })
+            .stabilize((request_, response, client, model_, context_) -> {
+                try {
+                    DescribeLogGroupsResponse res = client.injectCredentialsAndInvokeV2(
+                        DescribeLogGroupsRequest.builder().logGroupNamePrefix(model_.getLogGroupName()).build(),
+                        client.client()::describeLogGroups
+                    );
+                    return res.logGroups().stream().noneMatch(
+                        grp -> grp.logGroupName().equals(model_.getLogGroupName()));
+                } catch (ResourceNotFoundException e) {
+                    return true;
+                }
+            })
+            .done(ignored -> ProgressEvent.success(null, context));
 
     }
 }

@@ -8,18 +8,26 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.in;
 
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
+import software.amazon.awssdk.services.sns.SnsClient;
+import software.amazon.awssdk.services.sns.model.SubscribeRequest;
+import software.amazon.cloudformation.proxy.CallChain;
 import software.amazon.cloudformation.proxy.Delay;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
+import software.amazon.cloudformation.proxy.StdCallbackContext;
 import software.amazon.cloudformation.proxy.delay.Constant;
 import software.amazon.cloudformation.test.InjectProfileCredentials;
 import software.amazon.cloudformation.test.InjectSessionCredentials;
 import software.amazon.cloudformation.test.KMSKeyEnabledServiceIntegrationTestBase;
 
 import java.time.Duration;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -83,6 +91,13 @@ public class LifecycleTest extends KMSKeyEnabledServiceIntegrationTestBase {
         assertThat(event.isSuccess()).isTrue();
     }
 
+    @lombok.Getter
+    @lombok.Setter
+    public static class Subscription {
+        private String endpoint;
+        private String protocol;
+    }
+
     @Order(200)
     @Test
     public void removeRetention() {
@@ -93,6 +108,10 @@ public class LifecycleTest extends KMSKeyEnabledServiceIntegrationTestBase {
             .handleRequest(getProxy(), createRequest(model, current), null, getLoggerProxy());
         model = event.getResourceModel();
         assertThat(event.isSuccess()).isTrue();
+    }
+
+    private Set<Subscription> getSubscriptions() {
+        return Collections.emptySet();
     }
 
     @Order(250)

@@ -26,7 +26,7 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         return
             handleRetentionChange(desired, current, initiator)
             .then(evt -> handleKMSKeyChange(desired, current, initiator, evt))
-            .then(evt -> new ReadHandler().handleRequest(proxy, request, callbackContext, logger));
+            .then(evt -> new ReadHandler().handleRequest(proxy, request, evt.getCallbackContext(), logger));
     }
 
     protected ProgressEvent<ResourceModel, CallbackContext> handleRetentionChange(

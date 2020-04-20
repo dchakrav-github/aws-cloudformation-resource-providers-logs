@@ -1,43 +1,28 @@
 package software.amazon.logs.loggroup;
 
+import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
+import software.amazon.awssdk.services.cloudwatchlogs.model.DescribeLogGroupsRequest;
 import software.amazon.cloudformation.exceptions.ResourceNotFoundException;
-import software.amazon.cloudformation.proxy.AmazonWebServicesClientProxy;
-import software.amazon.cloudformation.proxy.Logger;
 import software.amazon.cloudformation.proxy.OperationStatus;
 import software.amazon.cloudformation.proxy.ProgressEvent;
 import software.amazon.cloudformation.proxy.ResourceHandlerRequest;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import static org.mockito.Mockito.*;
 import software.amazon.awssdk.services.cloudwatchlogs.model.DescribeLogGroupsResponse;
 import software.amazon.awssdk.services.cloudwatchlogs.model.LogGroup;
+import software.amazon.cloudformation.test.AbstractMockTestBase;
 
 import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 
-@ExtendWith(MockitoExtension.class)
-public class ReadHandlerTest {
-    ReadHandler handler;
+public class ReadHandlerTest extends AbstractMockTestBase<CloudWatchLogsClient> {
+    ReadHandler handler = new ReadHandler();
 
-    @Mock
-    private AmazonWebServicesClientProxy proxy;
-
-    @Mock
-    private Logger logger;
-
-    @BeforeEach
-    public void setup() {
-        handler = new ReadHandler();
-        proxy = mock(AmazonWebServicesClientProxy.class);
-        logger = mock(Logger.class);
+    public ReadHandlerTest() {
+        super(CloudWatchLogsClient.class);
     }
 
     @Test
@@ -50,12 +35,16 @@ public class ReadHandlerTest {
                 .logGroups(Collections.singletonList(logGroup))
                 .build();
 
-        doReturn(describeResponse)
-            .when(proxy)
-            .injectCredentialsAndInvokeV2(
-                ArgumentMatchers.any(),
-                ArgumentMatchers.any()
-            );
+        when(getServiceClient().describeLogGroups(ArgumentMatchers.any(DescribeLogGroupsRequest.class)))
+            //
+            // Sdk equality needs to match on the configuration override as well for equality
+            // Sdk Auth has incorrect equality clauses for StaticProviders, causing this to fail
+            // Hence using the is the same type above
+            //
+            // DescribeLogGroupsRequest.builder().logGroupNamePrefix("LogGroup").overrideConfiguration(configuration).build()))
+            //
+            //
+            .thenReturn(describeResponse);
 
         final ResourceModel model = ResourceModel.builder()
                 .logGroupName("LogGroup")
@@ -66,14 +55,14 @@ public class ReadHandlerTest {
             .desiredResourceState(model)
             .build();
 
-        final ProgressEvent<ResourceModel, CallbackContext> response = handler.handleRequest(proxy, request, null, logger);
+        final ProgressEvent<ResourceModel, CallbackContext> response = handler
+            .handleRequest(proxy, request, null, getLoggerProxy());
 
         assertThat(response).isNotNull();
         assertThat(response.getStatus()).isEqualTo(OperationStatus.SUCCESS);
         assertThat(response.getCallbackContext()).isNull();
         assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
         assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getResourceModel()).isEqualToComparingFieldByField(logGroup);
         assertThat(response.getMessage()).isNull();
         assertThat(response.getErrorCode()).isNull();
     }
@@ -84,12 +73,16 @@ public class ReadHandlerTest {
                 .logGroups(Collections.emptyList())
                 .build();
 
-        doReturn(describeResponse)
-                .when(proxy)
-                .injectCredentialsAndInvokeV2(
-                        ArgumentMatchers.any(),
-                        ArgumentMatchers.any()
-                );
+        when(getServiceClient().describeLogGroups(ArgumentMatchers.any(DescribeLogGroupsRequest.class)))
+            //
+            // Sdk equality needs to match on the configuration override as well for equality
+            // Sdk Auth has incorrect equality clauses for StaticProviders, causing this to fail
+            // Hence using the is the same type above
+            //
+            // DescribeLogGroupsRequest.builder().logGroupNamePrefix("LogGroup").overrideConfiguration(configuration).build()))
+            //
+            //
+            .thenReturn(describeResponse);
 
         final ResourceModel model = ResourceModel.builder()
                 .logGroupName("LogGroup")
@@ -101,29 +94,7 @@ public class ReadHandlerTest {
                 .build();
 
         assertThrows(ResourceNotFoundException.class,
-            () -> handler.handleRequest(proxy, request, null, logger));
-    }
-
-    @Test
-    public void handleRequest_FailureNotFound_WithException() {
-        doThrow(software.amazon.awssdk.services.cloudwatchlogs.model.ResourceNotFoundException.class)
-            .when(proxy)
-            .injectCredentialsAndInvokeV2(
-                ArgumentMatchers.any(),
-                ArgumentMatchers.any()
-            );
-
-        final ResourceModel model = ResourceModel.builder()
-            .logGroupName("LogGroup")
-            .retentionInDays(1)
-            .build();
-
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-            .desiredResourceState(model)
-            .build();
-
-        assertThrows(ResourceNotFoundException.class,
-            () -> handler.handleRequest(proxy, request, null, logger));
+            () -> handler.handleRequest(proxy, request, null, getLoggerProxy()));
     }
 
     @Test
@@ -136,7 +107,7 @@ public class ReadHandlerTest {
             .build();
 
         assertThrows(ResourceNotFoundException.class,
-            () -> handler.handleRequest(proxy, request, null, logger));
+            () -> handler.handleRequest(proxy, request, null, getLoggerProxy()));
     }
 
     @Test
@@ -145,6 +116,6 @@ public class ReadHandlerTest {
             .build();
 
         assertThrows(ResourceNotFoundException.class,
-            () -> handler.handleRequest(proxy, request, null, logger));
+            () -> handler.handleRequest(proxy, request, null, getLoggerProxy()));
     }
 }
