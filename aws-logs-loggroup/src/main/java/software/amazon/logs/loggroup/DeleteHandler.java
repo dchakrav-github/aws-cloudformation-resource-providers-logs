@@ -26,8 +26,8 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
             initiator = proxy.newInitiator(ClientBuilder::getClient, model, context);
 
         return initiator.initiate("logs:deleteLogGroup")
-            .translate(m -> DeleteLogGroupRequest.builder().logGroupName(m.getLogGroupName()).build())
-            .call((r, c) -> {
+            .translateToServiceRequest(m -> DeleteLogGroupRequest.builder().logGroupName(m.getLogGroupName()).build())
+            .makeServiceCall((r, c) -> {
                 try {
                     return c.injectCredentialsAndInvokeV2(r, c.client()::deleteLogGroup);
                 } catch (ResourceNotFoundException e) {
@@ -47,6 +47,5 @@ public class DeleteHandler extends BaseHandler<CallbackContext> {
                 }
             })
             .done(ignored -> ProgressEvent.success(null, context));
-
     }
 }

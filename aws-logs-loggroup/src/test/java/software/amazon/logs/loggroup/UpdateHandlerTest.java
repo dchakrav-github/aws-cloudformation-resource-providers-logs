@@ -1,6 +1,7 @@
 package software.amazon.logs.loggroup;
 
 import org.mockito.ArgumentMatcher;
+import software.amazon.awssdk.services.cloudwatch.model.ResourceNotFoundException;
 import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
 import software.amazon.awssdk.services.cloudwatchlogs.model.CreateLogGroupRequest;
 import software.amazon.awssdk.services.cloudwatchlogs.model.CreateLogGroupResponse;
@@ -180,8 +181,9 @@ public class UpdateHandlerTest extends AbstractMockTestBase<CloudWatchLogsClient
         assertThat(response.getCallbackContext()).isNotNull();
         assertThat(response.getCallbackDelaySeconds()).isEqualTo(0);
         assertThat(response.getResourceModels()).isNull();
-        assertThat(response.getResourceModel()).isEqualToComparingFieldByField(logGroup);
+        assertThat(response.getResourceModel()).isNotNull();
         assertThat(response.getMessage()).isNull();
+        assertThat(response.getResourceModel().getRetentionInDays()).isNull();
         assertThat(response.getErrorCode()).isNull();
     }
 
@@ -232,20 +234,27 @@ public class UpdateHandlerTest extends AbstractMockTestBase<CloudWatchLogsClient
 
     @Test
     public void handleRequest_FailureNotFound_ServiceException() {
-        doThrow(software.amazon.awssdk.services.cloudwatchlogs.model.ResourceNotFoundException.class)
-            .when(proxy)
-            .injectCredentialsAndInvokeV2(
-                ArgumentMatchers.any(),
-                ArgumentMatchers.any()
-            );
-
         final ResourceModel model = ResourceModel.builder()
             .logGroupName("LogGroup")
-            .retentionInDays(1)
+            .retentionInDays(7)
+            .build();
+        final ResourceModel desiredState = ResourceModel.builder()
+            .logGroupName("LogGroup")
+            .retentionInDays(14)
             .build();
 
+        final PutRetentionPolicyRequest retentionPolicyRequest =
+            PutRetentionPolicyRequest.builder()
+                .logGroupName("LogGroup")
+                .retentionInDays(14)
+                .build();
+        final ArgumentMatcher<PutRetentionPolicyRequest> argumentMatcher = argCmp(retentionPolicyRequest);
+        when(getServiceClient().putRetentionPolicy(argThat(argumentMatcher)))
+            .thenThrow(ResourceNotFoundException.builder().build());
+
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
-            .desiredResourceState(model)
+            .desiredResourceState(desiredState)
+            .previousResourceState(model)
             .build();
 
         assertThrows(software.amazon.cloudformation.exceptions.ResourceNotFoundException.class,

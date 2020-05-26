@@ -105,7 +105,7 @@ public class CreateHandlerTest extends AbstractMockTestBase<CloudWatchLogsClient
                 .retentionInDays(retentionInDays)
                 .build();
 
-        final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()
+        final ResourceHandlerRequest<ResourceModel> request =  ResourceHandlerRequest.<ResourceModel>builder()
             .desiredResourceState(model)
             .build();
 
