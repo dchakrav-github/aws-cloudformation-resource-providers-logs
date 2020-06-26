@@ -243,7 +243,7 @@ public class CreateHandlerTest extends AbstractMockTestBase<CloudWatchLogsClient
 
         final ResourceModel model = ResourceModel.builder()
             .logGroupName(logGroupName)
-            .kMSKey(kmsKeyArn)
+            .kmsKeyArn(kmsKeyArn)
             .build();
 
         final ResourceHandlerRequest<ResourceModel> request = ResourceHandlerRequest.<ResourceModel>builder()

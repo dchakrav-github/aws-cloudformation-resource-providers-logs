@@ -109,7 +109,7 @@ public class LifecycleTest extends KMSKeyEnabledServiceIntegrationTestBase {
         final ResourceModel current = ResourceModel.builder().arn(model.getArn())
             .logGroupName(model.getLogGroupName()).retentionInDays(model.getRetentionInDays()).build();
         model.setRetentionInDays(14);
-        model.setKMSKey("Does-not-exist");
+        model.setKmsKeyArn("Does-not-exist");
         ProgressEvent<ResourceModel, CallbackContext> event = new UpdateHandler()
             .handleRequest(getProxy(), createRequest(model, current), null, getLoggerProxy());
         assertThat(event.isFailed()).isTrue();
@@ -123,7 +123,7 @@ public class LifecycleTest extends KMSKeyEnabledServiceIntegrationTestBase {
             context.findFirstResponseByContains("logs:UpdateRetentionInDays");
         assertThat(retentionPolicyRequest).isNotNull();
         assertThat(retentionPolicyResponse).isNotNull();
-        model.setKMSKey(null);
+        model.setKmsKeyArn(null);
     }
 
     // TODO make it parameterized
@@ -135,7 +135,7 @@ public class LifecycleTest extends KMSKeyEnabledServiceIntegrationTestBase {
         String kmsKeyId = getKmsKeyId();
         String kmsKeyArn = getKmsKeyArn();
         addServiceAccess("logs", kmsKeyId);
-        model.setKMSKey(kmsKeyArn);
+        model.setKmsKeyArn(kmsKeyArn);
         ProgressEvent<ResourceModel, CallbackContext> event = new UpdateHandler()
             .handleRequest(getProxy(), createRequest(model, current), null, getLoggerProxy());
         System.out.println("Error is " + event.getMessage());
@@ -148,9 +148,9 @@ public class LifecycleTest extends KMSKeyEnabledServiceIntegrationTestBase {
     void removeKMS() {
         final ResourceModel current = ResourceModel.builder().arn(model.getArn())
             .logGroupName(model.getLogGroupName()).retentionInDays(model.getRetentionInDays())
-            .kMSKey(model.getKMSKey())
+            .kmsKeyArn(model.getKmsKeyArn())
             .build();
-        model.setKMSKey(null);
+        model.setKmsKeyArn(null);
         ProgressEvent<ResourceModel, CallbackContext> event = new UpdateHandler()
             .handleRequest(getProxy(), createRequest(model, current), null, getLoggerProxy());
         assertThat(event.isSuccess()).isTrue();

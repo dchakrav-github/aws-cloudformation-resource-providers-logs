@@ -50,10 +50,10 @@ public class UpdateHandler extends BaseHandler<CallbackContext> {
         //
         // Handle KMS key changes
         //
-        if (desired.getKMSKey() == null && current.getKMSKey() != null) {
+        if (desired.getKmsKeyArn() == null && current.getKmsKeyArn() != null) {
             return disassociateKMSKey(initiator);
         }
-        else if (desired.getKMSKey() != null && !desired.getKMSKey().equals(current.getKMSKey())) {
+        else if (desired.getKmsKeyArn() != null && !desired.getKmsKeyArn().equals(current.getKmsKeyArn())) {
             //
             // Change KMS keys association
             //

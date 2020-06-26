@@ -37,7 +37,7 @@
             "description": "The CloudWatch log group ARN.",
             "type": "string"
         },
-        "KMSKey": {
+        "KmsKeyArn": {
             "description": "KMS Key associated with log group to encrypt",
             "type": "string"
         }

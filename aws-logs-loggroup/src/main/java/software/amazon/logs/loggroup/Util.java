@@ -56,12 +56,12 @@ final class Util {
     static ProgressEvent<ResourceModel, CallbackContext> associateKMSKey(
         final CallChain.Initiator<CloudWatchLogsClient, ResourceModel, CallbackContext> initiator,
         final ProgressEvent<ResourceModel, CallbackContext> event) {
-        return initiator.getResourceModel().getKMSKey() == null ? event :
+        return initiator.getResourceModel().getKmsKeyArn() == null ? event :
             initiator
                 .translateToServiceRequest(m ->
                     AssociateKmsKeyRequest.builder()
                         .logGroupName(m.getLogGroupName())
-                        .kmsKeyId(m.getKMSKey())
+                        .kmsKeyId(m.getKmsKeyArn())
                         .build())
                 //
                 // Sometimes when KMS keys is created along with the Log groups it takes a while to be in region

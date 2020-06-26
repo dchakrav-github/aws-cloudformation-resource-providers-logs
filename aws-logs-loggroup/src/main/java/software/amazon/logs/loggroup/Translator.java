@@ -80,7 +80,7 @@ final class Translator {
                 .arn(logGroupArn)
                 .logGroupName(logGroupName)
                 .retentionInDays(retentionInDays)
-                .kMSKey(kmsKeyId)
+                .kmsKeyArn(kmsKeyId)
                 .build();
     }
 

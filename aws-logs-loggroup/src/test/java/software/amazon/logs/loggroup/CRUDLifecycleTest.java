@@ -67,19 +67,19 @@ public class CRUDLifecycleTest extends CRUDLifecycleTestBase<ResourceModel, Call
                 .update(ResourceModel.builder().logGroupName(logGroupName).retentionInDays(7).build())
                 .updateFail(
                     ResourceModel.builder().logGroupName(logGroupName).retentionInDays(7)
-                        .kMSKey("kmsKeyDoesNotExist").build())
+                        .kmsKeyArn("kmsKeyDoesNotExist").build())
                 //
                 // can not access logs service
                 //
                 .updateFail(() -> {
                     removeServiceAccess("logs", kmsKeyId, Region.US_EAST_2);
                     return ResourceModel.builder().logGroupName(logGroupName).retentionInDays(7)
-                        .kMSKey(kmsKeyArn).build();
+                        .kmsKeyArn(kmsKeyArn).build();
                 })
                 .update(() -> {
                     addServiceAccess("logs", kmsKeyId, Region.US_EAST_2);
                     return ResourceModel.builder().logGroupName(logGroupName).retentionInDays(7)
-                        .kMSKey(kmsKeyArn).build();
+                        .kmsKeyArn(kmsKeyArn).build();
                 })
                 .delete(ResourceModel.builder().logGroupName(logGroupName).build()));
         return testGroups;
